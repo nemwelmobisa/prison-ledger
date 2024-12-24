@@ -1,0 +1,93 @@
+type CommunicationLog = record {
+  id : nat64;
+  officer_id : nat64;
+  message : text;
+  inmate_id : nat64;
+  timestamp : nat64;
+};
+type CourtHearing = record {
+  id : nat64;
+  date : nat64;
+  inmate_id : nat64;
+  outcome : text;
+};
+type CreateDisciplinaryActionPayload = record {
+  action : text;
+  officer_id : nat64;
+  inmate_id : nat64;
+};
+type CreateInmatePayload = record {
+  age : nat64;
+  name : text;
+  sentence_details : text;
+  gender : text;
+  emergency_contact : EmergencyContact;
+};
+type CreatePrisonPayload = record {
+  name : text;
+  capacity : nat64;
+  location : text;
+};
+type DisciplinaryAction = record {
+  id : nat64;
+  action : text;
+  officer_id : nat64;
+  inmate_id : nat64;
+  timestamp : nat64;
+};
+type EmergencyContact = record {
+  relationship : text;
+  name : text;
+  phone_number : text;
+};
+type Inmate = record {
+  id : nat64;
+  age : nat64;
+  name : text;
+  sentence_details : text;
+  gender : text;
+  disciplinary_actions : vec text;
+  emergency_contact : EmergencyContact;
+};
+type InmateRecord = record {
+  id : nat64;
+  last_updated : nat64;
+  disciplinary_actions : vec text;
+  inmate_id : nat64;
+  court_hearings : vec nat64;
+};
+type Message = variant {
+  Error : text;
+  PaymentFailed : text;
+  InvalidPayload : text;
+  NotFound : text;
+  Success : text;
+  PaymentCompleted : text;
+};
+type Prison = record {
+  id : nat64;
+  inmates : vec nat64;
+  name : text;
+  capacity : nat64;
+  location : text;
+};
+type Result = variant { Ok : Prison; Err : Message };
+type Result_1 = variant { Ok : CommunicationLog; Err : Message };
+type Result_2 = variant { Ok : CourtHearing; Err : Message };
+type Result_3 = variant { Ok : DisciplinaryAction; Err : Message };
+type Result_4 = variant { Ok : Inmate; Err : Message };
+type Result_5 = variant { Ok : vec DisciplinaryAction; Err : Message };
+type Result_6 = variant { Ok : InmateRecord; Err : Message };
+service : {
+  assign_inmate_to_prison : (nat64, nat64) -> (Result);
+  create_communication_log : (nat64, nat64, text) -> (Result_1);
+  create_court_hearing : (nat64, nat64, text) -> (Result_2);
+  create_disciplinary_action : (CreateDisciplinaryActionPayload) -> (Result_3);
+  create_inmate : (CreateInmatePayload) -> (Result_4);
+  create_prison : (CreatePrisonPayload) -> (Result);
+  get_inmate : (nat64) -> (Result_4) query;
+  get_inmate_disciplinary_actions : (nat64) -> (Result_5) query;
+  get_inmate_record : (nat64) -> (Result_6) query;
+  get_prison_details : (nat64) -> (Result) query;
+  update_inmate : (nat64, CreateInmatePayload) -> (Result_4);
+}
