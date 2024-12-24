@@ -48,8 +48,8 @@ sh -ci "$(curl -fsSL https://internetcomputer.org/install.sh)"
 
 2. Clone the repository:
 ```bash
-git clone [repository-url]
-cd prison-management-system
+git clone https://github.com/nemwelmobisa/prison-ledger.git
+cd prison-ledger
 ```
 
 3. Deploy the canister:
