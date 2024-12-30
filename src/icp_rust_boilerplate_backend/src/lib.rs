@@ -267,6 +267,20 @@ thread_local! {
     ));
 }
 
+// Utility functions for validation
+fn validate_fields(fields: Vec<&str>, message: &str) -> Result<(), Message> {
+    if fields.iter().any(|field| field.is_empty()) {
+        Err(Message::InvalidPayload(message.to_string()))
+    } else {
+        Ok(())
+    }
+}
+
+// Centralized error generation
+fn not_found_error(entity: &str, id: u64) -> Message {
+    Message::NotFound(format!("{entity} with ID {id} not found"))
+}
+
 // Create Inmate function
 #[ic_cdk::update]
 fn create_inmate(payload: CreateInmatePayload) -> Result<Inmate, Message> {
@@ -300,22 +314,25 @@ fn create_inmate(payload: CreateInmatePayload) -> Result<Inmate, Message> {
     Ok(inmate)
 }
 
-// Create Prison function
-#[ic_cdk::update]
-fn create_prison(payload: CreatePrisonPayload) -> Result<Prison, Message> {
-    if payload.name.is_empty() || payload.location.is_empty() {
-        return Err(Message::InvalidPayload(
-            "Missing required fields".to_string(),
-        ));
-    }
-
-    let prison_id = ID_COUNTER
+// Generate unique ID
+fn generate_unique_id() -> Result<u64, Message> {
+    ID_COUNTER
         .with(|counter| {
             let current_value = *counter.borrow().get();
             counter.borrow_mut().set(current_value + 1)
         })
-        .expect("Counter increment failed");
+        .map_err(|_| Message::Error("Failed to generate unique ID".to_string()))
+}
 
+// Create Prison function
+#[ic_cdk::update]
+fn create_prison(payload: CreatePrisonPayload) -> Result<Prison, Message> {
+    validate_fields(
+        vec![&payload.name, &payload.location],
+        "Name and Location are required.",
+    )?;
+
+    let prison_id = generate_unique_id()?;
     let prison = Prison {
         id: prison_id,
         name: payload.name,
@@ -330,6 +347,60 @@ fn create_prison(payload: CreatePrisonPayload) -> Result<Prison, Message> {
 
     Ok(prison)
 }
+
+// Remove Inmate from Prison
+#[ic_cdk::update]
+fn remove_inmate_from_prison(inmate_id: u64, prison_id: u64) -> Result<Prison, Message> {
+    PRISONS.with(|prisons| {
+        let mut prisons = prisons.borrow_mut();
+        match prisons.get(&prison_id) {
+            Some(mut prison) => {
+                // Remove inmate from the prison's inmate list
+                prison.inmates.retain(|&id| id != inmate_id);
+                // Update the modified prison back into the map
+                prisons.insert(prison_id, prison.clone());
+                Ok(prison)
+            }
+            None => Err(not_found_error("Prison", prison_id)),
+        }
+    })
+}
+
+
+// Get all inmates in a specific prison
+#[ic_cdk::query]
+fn get_prison_inmates(prison_id: u64) -> Result<Vec<Inmate>, Message> {
+    PRISONS.with(|prisons| {
+        match prisons.borrow().get(&prison_id) {
+            Some(prison) => {
+                let inmate_list = prison.inmates.iter()
+                    .filter_map(|&inmate_id| INMATES.with(|inmates| inmates.borrow().get(&inmate_id)))
+                    .collect::<Vec<_>>();
+                Ok(inmate_list)
+            }
+            None => Err(not_found_error("Prison", prison_id)),
+        }
+    })
+}
+
+// Get all registered prisons
+#[ic_cdk::query]
+fn get_all_prisons() -> Result<Vec<Prison>, Message> {
+    PRISONS.with(|prisons| {
+        let prisons = prisons.borrow();
+        Ok(prisons.iter().map(|(_, prison)| prison).collect())
+    })
+}
+
+// Get all registered inmates
+#[ic_cdk::query]
+fn get_all_inmates() -> Result<Vec<Inmate>, Message> {
+    INMATES.with(|inmates| {
+        let inmates = inmates.borrow();
+        Ok(inmates.iter().map(|(_, inmate)| inmate).collect())
+    })
+}
+
 
 // Function to create a disciplinary action
 #[ic_cdk::update]
